@@ -1,0 +1,74 @@
+import trax.optimizers
+import trax.supervised.trainer_lib
+import trax.layers
+
+code.datasets.load_csv:
+    csv_dataset_path = 'traffic.csv'   # uses the default 1H frequency
+
+code.datasets.DataCollection:
+    data_loader = @load_csv()
+
+DataCollection_shrd/gin.singleton.constructor = @DataCollection
+
+code.datasets.Dataset:
+    data_full = @DataCollection_shrd/gin.singleton()
+    train_window = 8759  # 24 * 365 - 1
+    eval_window = 0  # If 0, then preceeds train, else (e.g. 24) follows.
+    series_length = 256  # must be the same as code.inputs.CreateInputs.series_length
+    train_series = None
+    eval_series = None
+
+Dataset_shrd/gin.singleton.constructor = @Dataset
+
+code.inputs.CreateInputs:
+    dataset = @Dataset_shrd/gin.singleton()
+    batch_size = 16
+    series_length = 256
+    weighted_sampling = False
+    traxify = True
+
+code.predictors.SerialPredictor:
+    d_in = 256
+    vocab_size = 10
+    precision = 3
+    significance_decay = 0.3
+    low = 0.0
+    high = 10.0
+    input_vocab_sizes = None  # no covariates used
+    normalization_regularizer = 0.001
+
+code.serializers.BoxSpaceSerializer:
+    max_range = (0.0, 50000.0)
+
+code.models.TransformerBody:
+    d_model = 256
+    d_ff_mul = 2
+    dropout = 0.1
+    max_len = 2048
+    n_heads = 4
+    n_layers = 6
+    conv_activation = None
+    conv_kernel = 1
+    conv_attention_kernel_width = None  # No conv attention
+    fraction_to_rotate = 0.25  # 1/4 d_head taken by a rotary emb
+    ff_activation = @trax.layers.FastGelu  # as in GPT-2
+    digit_encoding = False
+
+trax.supervised.lr_schedules.multifactor:
+    constant = 0.03
+    factors = 'constant * linear_warmup * rsqrt_decay'
+    warmup_steps = 1000
+
+code.trainer.train:
+    inputs = @code.inputs.CreateInputs
+    predictor_class = @code.predictors.SerialPredictor
+    model_body = @code.models.TransformerBody
+    optimizer = @trax.optimizers.Adam
+    lr_schedule = @trax.supervised.lr_schedules.multifactor
+    n_steps = 100000
+    eval_every = 1000
+    n_eval_batches = 30
+    calc_eval_loss = True
+
+code.trainer.SaveCheckpointCallback:
+    log_every = 99999  # one checpoint at the end.

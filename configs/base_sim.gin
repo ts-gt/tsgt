@@ -1,0 +1,9 @@
+code.simulations.read_train_exp:
+    horizon = 24
+    checkpoint_step = 99999
+
+code.simulations.simulate:
+    n_samples = 1024
+
+code.simulations.run_simulation_experiment:
+    exp_idx = 0

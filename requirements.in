@@ -1,0 +1,7 @@
+jax==0.2.25
+jaxlib[cuda11.cudnn82]<0.1.76
+jsonschema<4.0
+git+https://github.com/google/gin-config.git
+git+https://github.com/google/trax
+seaborn
+scikit-learn
